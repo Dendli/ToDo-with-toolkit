@@ -6,7 +6,6 @@ export default defineConfig({
   server: {
     port: 3000,
     open: true,
-    // Прокси для локального бэкенда (если используете localhost)
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

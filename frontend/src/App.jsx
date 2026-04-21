@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'; // ← Добавили React
+import React, { useState, useEffect } from 'react';
 import { todoAPI } from './api';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import './App.css';
@@ -34,7 +34,7 @@ function App() {
   const saveToServer = async (updatedTodos) => {
     if (syncMode !== 'server') return;
     try {
-      // Отправляем каждую задачу отдельно (typicode не поддерживает массовое обновление)
+      // Отправляем каждую задачу отдельно 
       for (const todo of updatedTodos) {
         if (todo.id && !todo.id.startsWith('local_')) {
           await todoAPI.update(todo.id, todo);
@@ -122,7 +122,7 @@ function App() {
     ? todos
     : todos.filter(t => t.category === selectedCategory);
 
-  return (//125 строка
+  return (
     <div className="app">
       <header className="app-header">
         <h1>📋 ToDo List</h1>
