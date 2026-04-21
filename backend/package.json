@@ -1,0 +1,12 @@
+{
+  "name": "todo-backend",
+  "version": "1.0.0",
+  "description": "Local JSON server for ToDo app",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "json-server": "^0.17.4"
+  }
+}
