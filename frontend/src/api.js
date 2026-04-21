@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Базовый URL: замените на ваш репозиторий на typicode
-const BASE_URL = 'https://my-json-server.typicode.com/your-username/your-repo';
+const BASE_URL = 'https://my-json-server.typicode.com/King-757/ToDo-with-toolkit';
 
 const api = axios.create({
   baseURL: BASE_URL,
