@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'; // ← Добавили React
 import { todoAPI } from './api';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import './App.css';
@@ -122,7 +122,7 @@ function App() {
     ? todos
     : todos.filter(t => t.category === selectedCategory);
 
-  return (
+  return (//125 строка
     <div className="app">
       <header className="app-header">
         <h1>📋 ToDo List</h1>

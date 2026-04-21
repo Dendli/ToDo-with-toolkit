@@ -1,10 +1,16 @@
-import React from 'react';
+import { StrictMode } from 'react'; 
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './App.css';
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+const rootElement = document.getElementById('root');
+
+if (!rootElement) {
+  console.error('❌ Элемент #root не найден');
+} else {
+  ReactDOM.createRoot(rootElement).render(
+    <StrictMode> {}
+      <App />
+    </StrictMode>
+  );
+}
