@@ -1,126 +1,119 @@
-import React, { useState, useEffect } from 'react';
-import { todoAPI } from './api';
-import { useLocalStorage } from './hooks/useLocalStorage';
+import { useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+  fetchTodos,
+  createTodo,
+  updateTodo,
+  deleteTodoFromServer,
+  setSyncMode,
+  setSelectedCategory,
+  addTodoLocal,
+  toggleTodoLocal,
+  deleteTodoLocal,
+  addSubtaskLocal,
+  toggleSubtaskLocal,
+  clearError,
+} from './features/todos/todosSlice';
 import './App.css';
 
-const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
-
 function App() {
-  const [todos, setTodos] = useLocalStorage('todos', []);
   const [newTodo, setNewTodo] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [loading, setLoading] = useState(false);
-  const [syncMode, setSyncMode] = useState('local'); // 'local' | 'server'
-
-  // Загрузка с сервера при переключении режима
-  useEffect(() => {
-    if (syncMode === 'server') {
-      loadFromServer();
-    }
-  }, [syncMode]);
-
-  const loadFromServer = async () => {
-    setLoading(true);
-    try {
-      const res = await todoAPI.getAll();
-      setTodos(res.data);
-    } catch (err) {
-      console.error('Ошибка загрузки с сервера:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const saveToServer = async (updatedTodos) => {
-    if (syncMode !== 'server') return;
-    try {
-      // Отправляем каждую задачу отдельно 
-      for (const todo of updatedTodos) {
-        if (todo.id && !todo.id.startsWith('local_')) {
-          await todoAPI.update(todo.id, todo);
-        } else {
-          await todoAPI.create(todo);
-        }
-      }
-    } catch (err) {
-      console.error('Ошибка сохранения на сервер:', err);
-    }
-  };
-
-  const addTodo = async (e) => {
-    e.preventDefault();
-    if (!newTodo.trim()) return;
-
-    const todo = {
-      id: syncMode === 'server' ? undefined : `local_${generateId()}`,
-      title: newTodo.trim(),
-      completed: false,
-      category: selectedCategory !== 'all' ? selectedCategory : 'general',
-      subtasks: [],
-      createdAt: new Date().toISOString(),
-    };
-
-    const updated = [...todos, todo];
-    setTodos(updated);
-    setNewTodo('');
-    await saveToServer(updated);
-  };
-
-  const toggleTodo = async (id) => {
-    const updated = todos.map(t =>
-      t.id === id ? { ...t, completed: !t.completed } : t
-    );
-    setTodos(updated);
-    await saveToServer(updated);
-  };
-
-  const deleteTodo = async (id) => {
-    const updated = todos.filter(t => t.id !== id);
-    setTodos(updated);
-    if (syncMode === 'server' && !id.startsWith('local_')) {
-      try {
-        await todoAPI.remove(id);
-      } catch (err) {
-        console.error('Ошибка удаления с сервера:', err);
-      }
-    } else {
-      await saveToServer(updated);
-    }
-  };
-
-  const addSubtask = async (todoId, title) => {
-    if (!title.trim()) return;
-    const subtask = { id: generateId(), title, completed: false };
-    const updated = todos.map(t =>
-      t.id === todoId
-        ? { ...t, subtasks: [...(t.subtasks || []), subtask] }
-        : t
-    );
-    setTodos(updated);
-    await saveToServer(updated);
-  };
-
-  const toggleSubtask = async (todoId, subtaskId) => {
-    const updated = todos.map(t => {
-      if (t.id === todoId) {
-        return {
-          ...t,
-          subtasks: t.subtasks?.map(st =>
-            st.id === subtaskId ? { ...st, completed: !st.completed } : st
-          ),
-        };
-      }
-      return t;
-    });
-    setTodos(updated);
-    await saveToServer(updated);
-  };
+  const [newSubtask, setNewSubtask] = useState({});
+  
+  const dispatch = useDispatch();
+  const todos = useSelector(state => state.todos.items);
+  const syncMode = useSelector(state => state.todos.syncMode);
+  const selectedCategory = useSelector(state => state.todos.selectedCategory);
+  const loading = useSelector(state => state.todos.loading);
+  const error = useSelector(state => state.todos.error);
 
   const categories = ['all', 'general', 'work', 'personal', 'shopping'];
 
   const filteredTodos = selectedCategory === 'all'
     ? todos
     : todos.filter(t => t.category === selectedCategory);
+
+  const handleAddTodo = async (e) => {
+    e.preventDefault();
+    if (!newTodo.trim()) return;
+
+    const todoData = {
+      title: newTodo.trim(),
+      category: selectedCategory !== 'all' ? selectedCategory : 'general',
+    };
+
+    if (syncMode === 'server') {
+      dispatch(createTodo(todoData));
+    } else {
+      dispatch(addTodoLocal(todoData));
+    }
+    setNewTodo('');
+  };
+
+  const handleToggleTodo = async (id) => {
+    if (syncMode === 'server') {
+      const todo = todos.find(t => t.id === id);
+      if (todo) {
+        dispatch(updateTodo({ id, updates: { ...todo, completed: !todo.completed } }));
+      }
+    } else {
+      dispatch(toggleTodoLocal(id));
+    }
+  };
+
+  const handleDeleteTodo = async (id) => {
+    if (syncMode === 'server' && !id.startsWith('local_')) {
+      dispatch(deleteTodoFromServer(id));
+    } else {
+      dispatch(deleteTodoLocal(id));
+    }
+  };
+
+  const handleAddSubtask = async (todoId, title) => {
+    if (!title.trim()) return;
+
+    if (syncMode === 'server') {
+      const todo = todos.find(t => t.id === todoId);
+      if (todo) {
+        const updatedSubtasks = [...(todo.subtasks || []), {
+          id: Date.now().toString(36) + Math.random().toString(36).substr(2),
+          title: title.trim(),
+          completed: false,
+        }];
+        dispatch(updateTodo({ id: todoId, updates: { ...todo, subtasks: updatedSubtasks } }));
+      }
+    } else {
+      dispatch(addSubtaskLocal({ todoId, title }));
+    }
+    setNewSubtask(prev => ({ ...prev, [todoId]: '' }));
+  };
+
+  const handleToggleSubtask = async (todoId, subtaskId) => {
+    if (syncMode === 'server') {
+      const todo = todos.find(t => t.id === todoId);
+      if (todo && todo.subtasks) {
+        const updatedSubtasks = todo.subtasks.map(st =>
+          st.id === subtaskId ? { ...st, completed: !st.completed } : st
+        );
+        dispatch(updateTodo({ id: todoId, updates: { ...todo, subtasks: updatedSubtasks } }));
+      }
+    } else {
+      dispatch(toggleSubtaskLocal({ todoId, subtaskId }));
+    }
+  };
+
+  const handleSyncModeChange = (mode) => {
+    dispatch(setSyncMode(mode));
+    if (mode === 'server') {
+      dispatch(fetchTodos());
+    }
+  };
+
+  const handleRefresh = () => {
+    if (syncMode === 'server') {
+      dispatch(fetchTodos());
+    }
+  };
 
   return (
     <div className="app">
@@ -131,7 +124,7 @@ function App() {
             <input
               type="radio"
               checked={syncMode === 'local'}
-              onChange={() => setSyncMode('local')}
+              onChange={() => handleSyncModeChange('local')}
             />
             Локально
           </label>
@@ -139,19 +132,26 @@ function App() {
             <input
               type="radio"
               checked={syncMode === 'server'}
-              onChange={() => setSyncMode('server')}
+              onChange={() => handleSyncModeChange('server')}
             />
             Сервер
           </label>
           {syncMode === 'server' && (
-            <button onClick={loadFromServer} disabled={loading}>
+            <button onClick={handleRefresh} disabled={loading}>
               {loading ? 'Загрузка...' : 'Обновить'}
             </button>
           )}
         </div>
       </header>
 
-      <form onSubmit={addTodo} className="todo-form">
+      {error && (
+        <div className="error-message">
+          <span>{error}</span>
+          <button onClick={() => dispatch(clearError())}>×</button>
+        </div>
+      )}
+
+      <form onSubmit={handleAddTodo} className="todo-form">
         <input
           type="text"
           value={newTodo}
@@ -161,7 +161,7 @@ function App() {
         />
         <select
           value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
+          onChange={(e) => dispatch(setSelectedCategory(e.target.value))}
           className="category-select"
         >
           {categories.map(cat => (
@@ -180,27 +180,41 @@ function App() {
               <input
                 type="checkbox"
                 checked={todo.completed}
-                onChange={() => toggleTodo(todo.id)}
+                onChange={() => handleToggleTodo(todo.id)}
               />
               <span className="todo-title">{todo.title}</span>
               <span className="todo-category">{todo.category}</span>
-              <button onClick={() => deleteTodo(todo.id)} className="delete-btn">×</button>
+              <button onClick={() => handleDeleteTodo(todo.id)} className="delete-btn">×</button>
             </div>
 
-            {/* Подкатегории */}
             <ul className="subtasks">
               {todo.subtasks?.map(sub => (
                 <li key={sub.id} className={`subtask ${sub.completed ? 'completed' : ''}`}>
                   <input
                     type="checkbox"
                     checked={sub.completed}
-                    onChange={() => toggleSubtask(todo.id, sub.id)}
+                    onChange={() => handleToggleSubtask(todo.id, sub.id)}
                   />
                   <span>{sub.title}</span>
                 </li>
               ))}
             </ul>
-            <AddSubtaskForm onAdd={(title) => addSubtask(todo.id, title)} />
+            
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleAddSubtask(todo.id, newSubtask[todo.id] || '');
+              }} 
+              className="add-subtask-form"
+            >
+              <input
+                type="text"
+                value={newSubtask[todo.id] || ''}
+                onChange={(e) => setNewSubtask(prev => ({ ...prev, [todo.id]: e.target.value }))}
+                placeholder="+ подзадача"
+                className="subtask-input"
+              />
+            </form>
           </li>
         ))}
       </ul>
@@ -209,31 +223,6 @@ function App() {
         <p className="empty-state">Задач нет. Добавьте первую!</p>
       )}
     </div>
-  );
-}
-
-// Компонент добавления подзадачи
-function AddSubtaskForm({ onAdd }) {
-  const [value, setValue] = useState('');
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (value.trim()) {
-      onAdd(value);
-      setValue('');
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="add-subtask-form">
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="+ подзадача"
-        className="subtask-input"
-      />
-    </form>
   );
 }
 
